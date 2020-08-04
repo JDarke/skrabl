@@ -3,9 +3,14 @@ export const findWordsOnBoard = (boardState, placedTiles) => {
     newWord = false,
     words = [],
     letters = [],
-    dirs = ["across", "down"],
+    dirs = ["down", "across"],
     squares = [];
+  // console.log('placedTiles:');
+  // console.log(placedTiles);
   const checkSquare = (dir, x, y) => {
+    if (y === 14) {
+      // console.log('');
+    }
     let [row, col] = dir === "across" ? [x, y] : [y, x];
     var currentSquare = boardState[col + row * 15];
     const addWord = () => {
@@ -37,22 +42,14 @@ export const findWordsOnBoard = (boardState, placedTiles) => {
       ) {
         newWord = true;
       }
-      if (
-        (dir == "across" && wordStart !== "" && col === 14) ||
-        (dir == "down" && wordStart !== "" && row === 14)
-      ) {
+      if (wordStart !== "" && col === 14) {
         addWord();
         wordStart = "";
         letters = [];
         newWord = false;
         squares = [];
-      } else {
-        if (dir == "across" && wordStart == "" && col !== 14) {
-          wordStart = `${row}-${col}`;
-        }
-        if (dir == "down" && wordStart == "" && row !== 14) {
-          wordStart = `${row}-${col}`;
-        }
+      } else if (wordStart == "" && col !== 14) {
+        wordStart = `${row}-${col}`;
       }
     }
   };

@@ -43,9 +43,10 @@ const GameScreen = ({
   const [gameIsOver, setGameIsOver] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState(null);
   const [boardState, setBoardState] = useState([]);
-  const [timeLeftPlayer, setTimeLeftPlayer] = useState(null);
-  const [timeLeftOpponent, setTimeLeftOpponent] = useState(null);
-  const [scores, setScores] = useState(null);
+  const [timeLeftPlayer, setTimeLeftPlayer] = useState(20);
+  const [timeLeftOpponent, setTimeLeftOpponent] = useState(20);
+  const [scores, setScores] = useState({ 0: 0, 1: 0 });
+  const [wordsOnBoard, setWordsOnBoard] = useState(null);
   const [highestScoringWord, setHighestScoringWord] = useState({
     word: "",
     points: 0,
@@ -55,8 +56,10 @@ const GameScreen = ({
   const [tilesToExchange, setTilesToExchange] = useState([]);
   const [boardIsDisabled, setBoardIsDisabled] = useState(false);
   const [consecutivePasses, setConsecutivePasses] = useState(0);
+  const [computerConsecutivePasses, setComputerConsecutivePasses] = useState(0);
   const [pouch, setPouch] = useState([]);
   const [computerRackTiles, setComputerRackTiles] = useState([]);
+  const [newMessage, setNewMessage] = useState();
   const fillPouch = async () => {
     const res = await axios.post("http://localhost:4001/getPouch", {
       lang,
@@ -74,7 +77,6 @@ const GameScreen = ({
       date: now.format("h:mm:ss a"),
     },
   ]);
-  
 
   useEffect(() => {
     if (gameMode === "Online") {
@@ -94,12 +96,9 @@ const GameScreen = ({
   }, [newMessage]);
 
   const handleSendMessage = (e) => {
-    console.log("HANDLE SEND MESSAGE");
     e.preventDefault();
     const token = localStorage.getItem("token");
     const newMessage = e.target.message.value;
-    console.log("NEW MESSAGE");
-    console.log(newMessage);
     socket.emit("sendMsg", {
       token,
       gameId: gameData.gameId,
@@ -109,43 +108,27 @@ const GameScreen = ({
     e.target.reset();
   };
 
-  const getComputerTiles = () => {
-    const numTilesNeeded = 7 - computerRackTiles.length;
-    const pouchCopy = [...pouch];
-    pouchCopy.splice(0, numTilesNeeded);
-    const newTiles = pouch.slice(0, numTilesNeeded);
-    setPouch([...pouchCopy]);
-    setComputerRackTiles([...computerRackTiles, ...newTiles]);
-  };
-
   useEffect(() => {
     if (gameMode === "Online") {
       if (turn === 1) {
         getTiles();
       }
     }
-    if (gameMode === "Computer" && pouch.length > 0) {
-      if (turn === 1) {
-        getTiles();
-      }
+    if (gameMode === "Computer") {
+      getTiles();
     }
-  }, [turn, gameMode]);
+  }, [turn]);
 
   useEffect(() => {
-    //need to get tiles at start after pouch is ready
-    //not sure best way to check that it's the start of the game
-    //this solution is not ideal as each lang has diff num tiles
-    if (gameMode === "Computer") {
-      if (lang === "en" || lang === "tr") {
-        if (turn === 0 && pouch.length === 100) {
-          getTiles();
-        }
-      }
-      if (lang === "fr") {
-        if (turn === 0 && pouch.length === 102) {
-          getTiles();
-        }
-      }
+    //fill racks at start of game (after pouch is ready)
+    if (pouch.length && !playerRackTiles.length && !computerRackTiles.length) {
+      const pouchCopy = [...pouch];
+      const newTilesHuman = pouchCopy.slice(0, 7);
+      const newTilesComputer = pouchCopy.slice(7, 14);
+      pouchCopy.splice(0, 14);
+      setPouch([...pouchCopy]);
+      setPlayerRackTiles([...newTilesHuman]);
+      setComputerRackTiles([...newTilesComputer]);
     }
   }, [pouch]);
 
@@ -156,85 +139,50 @@ const GameScreen = ({
     }
   }, [boardIsDisabled]);
 
-  useEffect(() => {
-    if (gameMode === "Computer" && turn === 1) {
-      computerMove();
-    }
-  }, [computerRackTiles]);
-
   const computerMove = () => {
     axios
       .post("http://localhost:4001/computerMove/", {
         rackTiles: computerRackTiles,
         boardState,
+        computerConsecutivePasses,
         lang,
         level,
       })
       .then((res) => {
-        if (res.data.pass) {
-          setNotification("The computer has decided to pass.");
+        if (res.data.exchange && pouch.length > 0) {
+          setComputerConsecutivePasses(0);
+          setNotification("SkrablBot has exchanged his tiles.");
+          const computerRackTilesCopy = [...computerRackTiles];
+          setPouch([...pouch, ...computerRackTilesCopy]);
+          setComputerRackTiles([]);
+          //computer rack tiles might not be updated by the time getTiles is called
+          nextPlayer();
+        } else if (res.data.pass || (res.data.exchange && !pouch.length)) {
+          setComputerConsecutivePasses(computerConsecutivePasses + 1);
+          setNotification("SkrablBot has decided to pass.");
           nextPlayer(1, scores, highestScoringWord);
         } else {
-          const lettersUsed = res.data.word.split("");
-          let tilesUsed = [];
-          const updatedComputerRackTiles = computerRackTiles.filter((tile) => {
-            if (lettersUsed.includes(tile.letter)) {
-              tilesUsed.push(tile);
-              const indexToRemove = lettersUsed.indexOf(tile.letter);
-              lettersUsed.splice(indexToRemove, 1);
-              return false;
-            } else {
-              return true;
-            }
-          });
-          const returnedBoardState = JSON.parse(
-            JSON.stringify(res.data.boardState)
+          setComputerConsecutivePasses(0);
+          const newWords = findWordsOnBoard(
+            res.data.newBoardState,
+            res.data.tilesUsed
+          ).filter((word) => word.newWord === true);
+          const [turnPoints, turnHighScore] = getTurnPoints(
+            newWords,
+            res.data.tilesUsed
           );
-          const updatedSquaresIndices = res.data.updatedSquares;
-          const lettersUsedAgain = res.data.word.split("");
-          let tilesUsedCopy = [...tilesUsed];
-          for (let i = 0; i < returnedBoardState.length; i++) {
-            if (
-              updatedSquaresIndices.includes(returnedBoardState[i].index) &&
-              lettersUsedAgain.includes(returnedBoardState[i].tile.letter)
-            ) {
-              let replacementTile = tilesUsedCopy.filter(
-                (tile) => tile.letter === returnedBoardState[i].tile.letter
-              )[0];
-
-              replacementTile = {
-                ...replacementTile,
-                player: 1,
-                square: returnedBoardState[i].index,
-              };
-              returnedBoardState[i].tile = replacementTile;
-              tilesUsedCopy = tilesUsedCopy.filter(
-                (tile) => tile.id !== replacementTile.id
-              );
-            }
+          if (turnHighScore.points > highestScoringWord.points) {
+            setHighestScoringWord(turnHighScore);
           }
-          setTimeout(() => {
-            const newWords = findWordsOnBoard(
-              returnedBoardState,
-              tilesUsed
-            ).filter((word) => word.newWord === true);
-            const [turnPoints, turnHighScore] = getTurnPoints(
-              newWords,
-              tilesUsed
-            );
-            if (turnHighScore.points > highestScoringWord.points) {
-              setHighestScoringWord(turnHighScore);
-            }
-            const playerPreviousPoints = scores[turn];
-            const updatedScores = {
-              ...scores,
-              [turn]: playerPreviousPoints + turnPoints,
-            };
-            setBoardState(returnedBoardState);
-            setScores(updatedScores);
-            nextPlayer(0, updatedScores, highestScoringWord);
-            setComputerRackTiles(updatedComputerRackTiles);
-          }, 5000);
+          const playerPreviousPoints = scores[turn];
+          const updatedScores = {
+            ...scores,
+            [turn]: playerPreviousPoints + turnPoints,
+          };
+          setBoardState(res.data.newBoardState);
+          setComputerRackTiles(res.data.newRackTiles);
+          setScores(updatedScores);
+          nextPlayer(0, updatedScores, highestScoringWord);
         }
       });
   };
@@ -242,7 +190,7 @@ const GameScreen = ({
   //EFFECTS
 
   useEffect(() => {
-    //set inital state
+    //get board and set inital state
     if (gameMode === "Online") {
       setGameIsOver(gameData.gameState.isOver);
       setPlayerRackTiles(
@@ -269,24 +217,11 @@ const GameScreen = ({
       setOutcome(null);
     }
     if (gameMode === "Computer") {
-      setGameIsOver(false);
-      setPlayerRackTiles([]);
-      setBoardState([]);
-      setTimeLeftPlayer(20);
-      setTimeLeftOpponent(20);
-      setScores({ 0: 0, 1: 0 });
-      setTurn(0);
-      setConsecutivePasses(null);
-      setHighestScoringWord({ word: "", points: 0 });
-    }
-  }, [gameMode]);
-
-  useEffect(() => {
-    if (gameMode === "Computer") {
       fillPouch();
+      setTurn(0);
     }
     getBoard();
-  }, []);
+  }, [gameMode]);
 
   useEffect(() => {
     placeTile();
@@ -302,6 +237,20 @@ const GameScreen = ({
       gameOver();
     }
   }, [consecutivePasses]);
+
+  useEffect(() => {
+    //called here to make sure pouch and player rack have finished updating first
+    if (gameMode === "Computer" && turn === 1) {
+      computerMove();
+    }
+  }, [playerRackTiles]);
+
+  useEffect(() => {
+    //if human passes or exchanges tiles, the above useEffect won't work so just call computerMove when turn changes
+    if (gameMode === "Computer" && turn === 1 && playerRackTiles.length === 7) {
+      computerMove();
+    }
+  }, [turn]);
 
   useEffect(() => {
     if (gameMode === "Online") {
@@ -331,18 +280,11 @@ const GameScreen = ({
         setScores(data.gameState.scores);
         setTurn(data.gameState.turn);
         setConsecutivePasses(data.gameState.consecutivePasses);
-        console.log("300 GS");
-        console.log(data.gameState.highestScoringWord);
         setHighestScoringWord(data.gameState.highestScoringWord);
         setOutcome(data.gameState.outcome);
       });
     }
-    if (gameMode === "Computer") {
-      if (turn === 1) {
-        getComputerTiles();
-      }
-    }
-  }, [playerRackTiles, confirmMessage]);
+  }, []);
 
   const getBoard = () => {
     const squares = generateBoardSquares(bonusSquareIndices);
@@ -350,11 +292,11 @@ const GameScreen = ({
   };
 
   const getTiles = () => {
-    const numTilesNeeded = 7 - playerRackTiles.length;
-    if (numTilesNeeded <= 0) {
-      return;
-    }
     if (gameMode === "Online") {
+      const numTilesNeeded = 7 - playerRackTiles.length;
+      if (numTilesNeeded <= 0) {
+        return;
+      }
       socket.emit("requestTiles", {
         gameId: gameData.gameId,
         numTilesNeeded: numTilesNeeded,
@@ -362,22 +304,30 @@ const GameScreen = ({
       });
     }
     if (gameMode === "Computer") {
+      let rackToUpdate;
+      if (turn === 1) {
+        rackToUpdate = playerRackTiles;
+      } else {
+        rackToUpdate = computerRackTiles;
+      }
+      const numTilesNeeded = 7 - rackToUpdate.length;
+      if (!numTilesNeeded) {
+        return;
+      }
       const pouchCopy = [...pouch];
       pouchCopy.splice(0, numTilesNeeded);
       const newTiles = pouch.slice(0, numTilesNeeded);
       setPouch([...pouchCopy]);
-      setPlayerRackTiles([...playerRackTiles, ...newTiles]);
+      if (rackToUpdate === computerRackTiles) {
+        setComputerRackTiles([...computerRackTiles, ...newTiles]);
+      } else {
+        setPlayerRackTiles([...playerRackTiles, ...newTiles]);
+      }
     }
   };
 
-  const nextPlayer = (
-    x = 0,
-    newScores = { 0: 0, 0: 0 },
-    highestScoringWord = highestScoringWord
-  ) => {
+  const nextPlayer = (x = 0, newScores = { 0: 0, 0: 0 }) => {
     if (gameMode === "Online") {
-      console.log("340 NxtPlyr");
-      console.log(highestScoringWord);
       socket.emit("updateGameState", {
         gameId: gameData.gameId,
         boardState: boardState,
@@ -393,6 +343,7 @@ const GameScreen = ({
     }
     if (gameMode === "Computer") {
       setTurn(turn === 0 ? 1 : 0);
+      setConsecutivePasses(consecutivePasses + x);
     }
   };
 
@@ -573,12 +524,21 @@ const GameScreen = ({
     setPlacedTiles([]);
   };
 
+  useEffect(() => {
+    if (placedTiles.length > 0) {
+      getWordsOnBoard();
+    }
+  }, [placedTiles]);
+
+  const getWordsOnBoard = () => {
+    const words = findWordsOnBoard(boardState, placedTiles);
+    setWordsOnBoard(words);
+  };
+
   const handleClickConfirmMove = () => {
     if (currentPlayer !== turn) return;
     if (moveIsValid(placedTiles, boardState)) {
-      const newWords = findWordsOnBoard(boardState, placedTiles).filter(
-        (word) => word.newWord === true
-      );
+      var newWords = wordsOnBoard.filter((word) => word.newWord === true);
       axios
         .post("http://localhost:4001/verifyWord", {
           words: newWords,
@@ -596,7 +556,6 @@ const GameScreen = ({
               ...scores,
               [turn]: playerPreviousPoints + turnPoints,
             };
-
             setScores(updatedScores);
             if (turnHighScore.points > highestScoringWord.points) {
               setHighestScoringWord(turnHighScore);
@@ -607,7 +566,6 @@ const GameScreen = ({
                 updatedScores,
                 highestScoringWord
               );
-
             setPlacedTiles([]);
             return;
           } else {
@@ -681,6 +639,7 @@ const GameScreen = ({
               handleClickTile={handleClickTile}
               lang={lang}
               turn={turn}
+              boardIsDisabled={boardIsDisabled}
             />
           </div>
           <StatusBar
