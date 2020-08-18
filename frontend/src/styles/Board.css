@@ -5,7 +5,6 @@
   display: flex;
   justify-content: center;
   width: 100%;
-  
 }
 
 .board__board {
@@ -17,7 +16,6 @@
   grid-template-columns: repeat(15, 1fr);
   grid-template-rows: repeat(15, 1fr);
   grid-gap: 1px;
-  
   min-height: 350px;
   min-width: 350px;
   border-radius: 4px;
@@ -26,7 +24,7 @@
   -ms-border-radius: 4px;
   -o-border-radius: 4px;
   user-select: none;
-  box-shadow: inset 0 -2px 2px rgba(0,0,0,0.3),
+  box-shadow: inset 0 -2px 2px rgba(0, 0, 0, 0.3),
     0px 2px 5px rgba(0, 0, 0, 0.5);
 }
 
@@ -42,14 +40,16 @@
   justify-content: center;
   align-items: center;
   position: relative;
-  transition: outline .5s ease;
-  -webkit-transition: outline .5s ease;
-  -moz-transition: outline .5s ease;
-  -ms-transition: outline .5s ease;
-  -o-transition: outline .5s ease;
+  transition: outline 0.5s ease;
+  -webkit-transition: outline 0.5s ease;
+  -moz-transition: outline 0.5s ease;
+  -ms-transition: outline 0.5s ease;
+  -o-transition: outline 0.5s ease;
+  max-width: 22px;
+  max-height: 22px;
 }
 
-.board__tile {
+/* .board__tile {
   color: rgb(42, 102, 42);
   display: flex;
   align-items: center;
@@ -60,9 +60,9 @@
   height: 100%;
   font-size: 1.1rem;
   box-shadow: 0 0 0px 1px black, inset 0 -1px 3px rgba(0, 0, 0, 0.5);
-}
+} */
 
-.board__square:hover {
+/* .board__square:hover {
   outline: 2px solid yellow;
   z-index: 3;
   transition: none;
@@ -70,12 +70,17 @@
   -moz-transition: none;
   -ms-transition: none;
   -o-transition: none;
+} */
+
+.board__square.board__draggingOver {
+  background: yellow;
 }
 
 .board__bonus-text {
   color: rgb(250, 244, 244);
-  text-shadow:0 0 2px rgb(3, 3, 3);
+  text-shadow: 0 0 2px rgb(3, 3, 3);
   font-size: 1.2em;
+  position: absolute;
 }
 
 .board__square {
@@ -119,6 +124,12 @@
   padding: 15%;
   filter: drop-shadow(0 0 1px rgb(165, 163, 163));
   -webkit-filter: drop-shadow(0 0 1px rgb(165, 163, 163));
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
 }
 
 /* tablet */
@@ -155,39 +166,34 @@
     min-height: 475px;
     min-width: 475px;
   }
-  
-  .board__bonus-text {  
+
+  .board__bonus-text {
     font-size: 2em;
   }
 }
 
 @media (max-height: 650px) {
-  .board__bonus-text {  
+  .board__bonus-text {
     font-size: 1.2em;
   }
 }
 
 /* laptop */
 
-
 /* desktop */
 @media (min-width: 1250px) {
   .board__bonus-text {
     display: block;
-    //font-size: 0.9rem;
-   
+    font-size: 0.9rem;
   }
-
+  .board__square {
+    max-width: 32px;
+    max-height: 32px;
+  }
 }
 
-
-
-
 @media (max-width: 970px) {
- 
 }
 
 @media (min-width: 1200px) {
- 
 }
-
