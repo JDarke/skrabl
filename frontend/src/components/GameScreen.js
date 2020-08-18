@@ -25,6 +25,7 @@ import removeTileSound from "../assets/removeTile.wav";
 import correctSound from "../assets/correct.wav";
 import invalidSound from "../assets/invalid.wav";
 import { notifications } from "../assets/notifications";
+import { DragDropContext } from "react-beautiful-dnd";
 import "../styles/GameScreen.css";
 
 const GameScreen = ({
@@ -88,7 +89,7 @@ const GameScreen = ({
   const [turnWords, setTurnWords] = useState([]);
   const [timeWarning, setTimeWarning] = useState(false);
   const [endedBy, setEndedBy] = useState(0);
-  const [blankTileLetter, setBlankTileLetter]= useState("")
+  const [blankTileLetter, setBlankTileLetter] = useState("");
 
   useBeforeunload(
     () => notifications["Are you sure you want to leave the game?"][lang]
@@ -201,9 +202,13 @@ const GameScreen = ({
             setBoardState(res.data.newBoardState);
             setComputerRackTiles(res.data.newRackTiles);
             setScores(updatedScores);
-            nextPlayer(consecutivePasses * -1, updatedScores, highestScoringWord);
+            nextPlayer(
+              consecutivePasses * -1,
+              updatedScores,
+              highestScoringWord
+            );
           }
-        }, (Math.floor((Math.random() * 6000) + 3000)))
+        }, Math.floor(Math.random() * 6000 + 3000));
       });
   };
 
@@ -275,12 +280,12 @@ const GameScreen = ({
   useEffect(() => {
     if (selectedTile) {
       const tile = selectedTile;
-      tile.letter = blankTileLetter
-      tile.wasBlank = true
-    setSelectedTile(tile)
-    placeTile2();
+      tile.letter = blankTileLetter;
+      tile.wasBlank = true;
+      setSelectedTile(tile);
+      placeTile2();
     }
-  }, [blankTileLetter])
+  }, [blankTileLetter]);
 
   useEffect(() => {
     if (gameMode === "Online") {
@@ -401,48 +406,45 @@ const GameScreen = ({
       playSound(placeTileSound);
 
       if (selectedTile.letter === "") {
-      
         setConfirmMessage({
           type: "blankTile",
-          message: "What letter would you like to assign to the blank tile?"
-        })
+          message: "What letter would you like to assign to the blank tile?",
+        });
         return;
-      }
-      else {
+      } else {
         const tile = selectedTile;
-        tile.wasBlank = false
-        setSelectedTile(tile)
-        placeTile2()
+        tile.wasBlank = false;
+        setSelectedTile(tile);
+        placeTile2();
       }
-    };
-  }
-    
-    const placeTile2 = () => {
-              const tileToAdd = {
-        ...selectedTile,
-        square: selectedSquareIndex,
-        player: 0,
-      };
-      const updatedBoardState = boardState.map((square) => {
-        if (square.index === selectedSquareIndex) {
-          return { ...square, tile: tileToAdd };
-        } else {
-          return square;
-        }
-      });
-
-      setBoardState(updatedBoardState);
-      setPlacedTiles([
-        ...placedTiles,
-        { ...selectedTile, square: selectedSquareIndex },
-      ]);
-      setPlayerRackTiles([
-        ...playerRackTiles.filter((tile) => tile.id !== selectedTile.id),
-      ]);
-      setSelectedTile(null);
-      setSelectedSquareIndex(null);
     }
-    
+  };
+
+  const placeTile2 = () => {
+    const tileToAdd = {
+      ...selectedTile,
+      square: selectedSquareIndex,
+      player: 0,
+    };
+    const updatedBoardState = boardState.map((square) => {
+      if (square.index === selectedSquareIndex) {
+        return { ...square, tile: tileToAdd };
+      } else {
+        return square;
+      }
+    });
+
+    setBoardState(updatedBoardState);
+    setPlacedTiles([
+      ...placedTiles,
+      { ...selectedTile, square: selectedSquareIndex },
+    ]);
+    setPlayerRackTiles([
+      ...playerRackTiles.filter((tile) => tile.id !== selectedTile.id),
+    ]);
+    setSelectedTile(null);
+    setSelectedSquareIndex(null);
+  };
 
   //EVENT HANDLERS
 
@@ -715,6 +717,113 @@ const GameScreen = ({
     setConfirmMessage(null);
   };
 
+  const onDragEnd = (result) => {
+    const { destination, source, draggableId } = result;
+    if (!destination) {
+      return;
+    }
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
+    }
+
+    //if moving tile within board
+    if (
+      Number(source.droppableId) >= 0 &&
+      Number(source.droppableId) <= 224 &&
+      Number(destination.droppableId) >= 0 &&
+      Number(destination.droppableId) <= 224
+    ) {
+      playSound(placeTileSound);
+
+      const movingTile = placedTiles.filter(
+        (tile) => JSON.stringify(tile.id) === draggableId
+      )[0];
+      movingTile.square = Number(destination.droppableId);
+      const updatedBoardState = boardState
+        .map((square) => {
+          if (JSON.stringify(square.index) === source.droppableId) {
+            return { ...square, tile: null };
+          } else return square;
+        })
+        .map((square) => {
+          if (JSON.stringify(square.index) === destination.droppableId) {
+            return {
+              ...square,
+              tile: movingTile,
+            };
+          } else {
+            return square;
+          }
+        });
+      setBoardState(updatedBoardState);
+      //if moving tile within rack
+    } else if (
+      source.droppableId === "rack" &&
+      destination.droppableId === "rack"
+    ) {
+      const movingTile = playerRackTiles.filter(
+        (tile) => JSON.stringify(tile.id) === draggableId
+      )[0];
+      const playerRackTilesCopy = [...playerRackTiles];
+      playerRackTilesCopy.splice(source.index, 1);
+      playerRackTilesCopy.splice(destination.index, 0, movingTile);
+      setPlayerRackTiles(playerRackTilesCopy);
+      //from rack to board
+    } else if (
+      source.droppableId === "rack" &&
+      Number(destination.droppableId) >= 0 &&
+      Number(destination.droppableId) <= 224
+    ) {
+      playSound(placeTileSound);
+
+      const movingTile = playerRackTiles.filter(
+        (tile) => JSON.stringify(tile.id) === draggableId
+      )[0];
+      movingTile.square = Number(destination.droppableId);
+
+      const updatedPlayerRackTiles = playerRackTiles.filter(
+        (tile) => JSON.stringify(tile.id) !== draggableId
+      );
+      setPlayerRackTiles(updatedPlayerRackTiles);
+      const updatedBoardState = boardState.map((square) => {
+        if (JSON.stringify(square.index) === destination.droppableId) {
+          return {
+            ...square,
+            tile: movingTile,
+          };
+        } else {
+          return square;
+        }
+      });
+      const updatedPlacedTiles = [...placedTiles, movingTile];
+      setPlacedTiles(updatedPlacedTiles);
+      setBoardState(updatedBoardState);
+      //from board to rack
+    } else {
+      const movingTile = placedTiles.filter(
+        (tile) => JSON.stringify(tile.id) === draggableId
+      )[0];
+      const updatedPlacedTiles = placedTiles.filter(
+        (tile) => JSON.stringify(tile.id) !== draggableId
+      );
+      setPlacedTiles(updatedPlacedTiles);
+      const playerRackTilesCopy = [...playerRackTiles];
+      playerRackTilesCopy.splice(destination.index, 0, movingTile);
+      setPlayerRackTiles(playerRackTilesCopy);
+      const updatedBoardState = boardState.map((square) => {
+        if (JSON.stringify(square.index) === source.droppableId) {
+          return { ...square, tile: null };
+        } else {
+          return square;
+        }
+      });
+      setBoardState(updatedBoardState);
+    }
+  };
+
   return (
     <Fade className="container__full-height" triggerOnce>
       <div className="gameScreen__wrapper">
@@ -729,22 +838,24 @@ const GameScreen = ({
         )}
         <div className="gameScreen__main">
           <div className="gameScreen__board">
-            <Board
-              handleClickSquare={handleClickSquare}
-              handleClickPlacedTile={handleClickPlacedTile}
-              boardState={boardState}
-              isDisabled={boardIsDisabled}
-              lang={lang}
-            />
-            <TileRack
-              selectedTile={selectedTile}
-              tilesToExchange={tilesToExchange}
-              playerRackTiles={playerRackTiles}
-              handleClickTile={handleClickTile}
-              lang={lang}
-              turn={turn}
-              boardIsDisabled={boardIsDisabled}
-            />
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Board
+                handleClickSquare={handleClickSquare}
+                handleClickPlacedTile={handleClickPlacedTile}
+                boardState={boardState}
+                isDisabled={boardIsDisabled}
+                lang={lang}
+              />
+              <TileRack
+                selectedTile={selectedTile}
+                tilesToExchange={tilesToExchange}
+                playerRackTiles={playerRackTiles}
+                handleClickTile={handleClickTile}
+                lang={lang}
+                turn={turn}
+                boardIsDisabled={boardIsDisabled}
+              />
+            </DragDropContext>
           </div>
           <StatusBar
             highestScoringWord={highestScoringWord}

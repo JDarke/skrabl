@@ -16,7 +16,6 @@
   grid-template-columns: repeat(15, 1fr);
   grid-template-rows: repeat(15, 1fr);
   grid-gap: 1px;
-
   min-height: 350px;
   min-width: 350px;
   border-radius: 4px;
@@ -46,6 +45,8 @@
   -moz-transition: outline 0.5s ease;
   -ms-transition: outline 0.5s ease;
   -o-transition: outline 0.5s ease;
+  max-width: 22px;
+  max-height: 22px;
 }
 
 /* .board__tile {
@@ -61,7 +62,7 @@
   box-shadow: 0 0 0px 1px black, inset 0 -1px 3px rgba(0, 0, 0, 0.5);
 } */
 
-.board__square:hover {
+/* .board__square:hover {
   outline: 2px solid yellow;
   z-index: 3;
   transition: none;
@@ -69,12 +70,17 @@
   -moz-transition: none;
   -ms-transition: none;
   -o-transition: none;
+} */
+
+.board__square.board__draggingOver {
+  background: yellow;
 }
 
 .board__bonus-text {
   color: rgb(250, 244, 244);
   text-shadow: 0 0 2px rgb(3, 3, 3);
   font-size: 1.2em;
+  position: absolute;
 }
 
 .board__square {
@@ -178,7 +184,11 @@
 @media (min-width: 1250px) {
   .board__bonus-text {
     display: block;
-    //font-size: 0.9rem;
+    font-size: 0.9rem;
+  }
+  .board__square {
+    max-width: 32px;
+    max-height: 32px;
   }
 }
 

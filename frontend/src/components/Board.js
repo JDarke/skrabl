@@ -2,6 +2,7 @@ import React from "react";
 import "../styles/Board.css";
 import Star from "../images/star.svg";
 import Tile from "./Tile";
+import { Droppable } from "react-beautiful-dnd";
 
 const getBonusClassName = (square) => {
   let bonusClassName = "";
@@ -65,62 +66,52 @@ const Board = ({
   isDisabled,
   lang,
 }) => {
-  // const getLetter = (tile) => {
-  //   let letter;
-  //   if (lang === "tr" && tile.letter === "i") {
-  //     letter = "İ";
-  //   } else if (lang === "tr" && tile.letter === "ı") {
-  //     letter = "I";
-  //   } else {
-  //     letter = tile.letter.toUpperCase();
-  //   }
-  //   return letter;
-  // };
-
   return (
     <div className="board__wrapper">
       <div className={"board__board " + (isDisabled ? "disabled" : "")}>
         {boardState &&
           boardState.length > 0 &&
-          boardState.map((square, index) => {
-            const bonusClassName = getBonusClassName(square);
-            let placedTile;
-            // if (square.tile) {
-            //   placedTile = (
-            //     <span
-            //       className="board__tile"
-            //       onClick={() => handleClickPlacedTile(square.tile)}
-            //     >
-            //       <span>{getLetter(square.tile)}</span>
-            //       <span className="tile__points--sm">{square.tile.points}</span>
-            //     </span>
-            //   );
-            // }
-            return (
-              <div
-                className={`board__square ${bonusClassName} ${
-                  index === 112 && "board__centre"
-                }`}
-                key={index}
-                onClick={(e) => handleClickSquare(square)}
-              >
-                {!placedTile && (
-                  <span className="board__bonus-text">
-                    {getBonusText(square)}
-                  </span>
-                )}
-                {!placedTile && index === 112 && (
-                  <img className="center__star" src={Star} />
-                )}
-                {square.tile && (
-                  <Tile
-                    handleClickPlacedTile={handleClickPlacedTile}
-                    tile={square.tile}
-                  />
-                )}
-              </div>
-            );
-          })}
+          boardState.map((square, index) => (
+            <Droppable
+              droppableId={JSON.stringify(index)}
+              type="tile"
+              key={index}
+              isDropDisabled={!!square.tile}
+            >
+              {(provided, snapshot) => {
+                const bonusClassName = getBonusClassName(square);
+                let placedTile;
+                return (
+                  <div
+                    className={`board__square ${bonusClassName} ${
+                      index === 112 && "board__centre"
+                    } ${snapshot.isDraggingOver && "board__draggingOver"}`}
+                    key={index}
+                    onClick={(e) => handleClickSquare(square)}
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                  >
+                    {!placedTile && (
+                      <span className="board__bonus-text">
+                        {getBonusText(square)}
+                      </span>
+                    )}
+                    {!placedTile && index === 112 && (
+                      <img className="center__star" src={Star} />
+                    )}
+                    {square.tile && (
+                      <Tile
+                        handleClickPlacedTile={handleClickPlacedTile}
+                        tile={square.tile}
+                        index={index + 7}
+                      />
+                    )}
+                    {provided.placeholder}
+                  </div>
+                );
+              }}
+            </Droppable>
+          ))}
       </div>
     </div>
   );

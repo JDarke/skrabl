@@ -1,11 +1,14 @@
 import { squaresAreOccupied } from "../utils/squaresAreOccupied";
 
 export const moveIsValid = (placedTiles, boardState) => {
+  console.log(placedTiles);
+  console.log(boardState);
   //must all be in same row or col
   const occupiedIndices = placedTiles.map((tile) => tile.square);
   const occupiedSquares = boardState.filter((square) =>
     occupiedIndices.includes(square.index)
   );
+  console.log(occupiedIndices);
   const rowsAreSame = occupiedSquares.every(
     (square) => square.row === occupiedSquares[0].row
   );
