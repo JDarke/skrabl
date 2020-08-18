@@ -25,6 +25,7 @@ const TileRack = ({
               lang={lang}
               turn={turn}
               boardIsDisabled={boardIsDisabled}
+              isInRack={true}
             />
           </div>
         ))}

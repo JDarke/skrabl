@@ -1,6 +1,7 @@
 import React from "react";
 import "../styles/Board.css";
 import Star from "../images/star.svg";
+import Tile from "./Tile";
 
 const getBonusClassName = (square) => {
   let bonusClassName = "";
@@ -52,7 +53,7 @@ const getBonusText = (square) => {
       bonusText = bonusText;
   }
   if (square.index === 112) {
-    bonusText = '';
+    bonusText = "";
   }
   return bonusText;
 };
@@ -64,37 +65,37 @@ const Board = ({
   isDisabled,
   lang,
 }) => {
-  const getLetter = (tile) => {
-    let letter;
-    if (lang === "tr" && tile.letter === "i") {
-      letter = "İ";
-    } else if (lang === "tr" && tile.letter === "ı") {
-      letter = "I";
-    } else {
-      letter = tile.letter.toUpperCase();
-    }
-    return letter;
-  };
+  // const getLetter = (tile) => {
+  //   let letter;
+  //   if (lang === "tr" && tile.letter === "i") {
+  //     letter = "İ";
+  //   } else if (lang === "tr" && tile.letter === "ı") {
+  //     letter = "I";
+  //   } else {
+  //     letter = tile.letter.toUpperCase();
+  //   }
+  //   return letter;
+  // };
 
   return (
     <div className="board__wrapper">
       <div className={"board__board " + (isDisabled ? "disabled" : "")}>
         {boardState &&
           boardState.length > 0 &&
-          boardState.map((square, index) => { 
-            const bonusClassName = getBonusClassName(square); 
+          boardState.map((square, index) => {
+            const bonusClassName = getBonusClassName(square);
             let placedTile;
-            if (square.tile) {
-              placedTile = (
-                <span
-                  className="board__tile"
-                  onClick={() => handleClickPlacedTile(square.tile)}
-                >
-                  <span>{getLetter(square.tile)}</span>
-                  <span className="tile__points--sm">{square.tile.points}</span>
-                </span>
-              );
-            }
+            // if (square.tile) {
+            //   placedTile = (
+            //     <span
+            //       className="board__tile"
+            //       onClick={() => handleClickPlacedTile(square.tile)}
+            //     >
+            //       <span>{getLetter(square.tile)}</span>
+            //       <span className="tile__points--sm">{square.tile.points}</span>
+            //     </span>
+            //   );
+            // }
             return (
               <div
                 className={`board__square ${bonusClassName} ${
@@ -111,7 +112,12 @@ const Board = ({
                 {!placedTile && index === 112 && (
                   <img className="center__star" src={Star} />
                 )}
-                {placedTile && placedTile}
+                {square.tile && (
+                  <Tile
+                    handleClickPlacedTile={handleClickPlacedTile}
+                    tile={square.tile}
+                  />
+                )}
               </div>
             );
           })}
