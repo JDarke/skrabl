@@ -44,6 +44,11 @@ const GameScreen = ({
   lang,
   setGameMode,
   level,
+  setInviteSent,
+  setInvitedPlayer,
+  setGameId,
+  setGameData,
+  mute,
 }) => {
   const [selectedTile, setSelectedTile] = useState(null);
   const [selectedSquareIndex, setSelectedSquareIndex] = useState(null);
@@ -95,6 +100,8 @@ const GameScreen = ({
     () => notifications["Are you sure you want to leave the game?"][lang]
   );
 
+  //CHAT FUNCTIONS
+  //______________________________________________________________________________
   useEffect(() => {
     if (gameMode === "Online") {
       socket.on("receiveMsg", (data) => {
@@ -125,6 +132,10 @@ const GameScreen = ({
     e.target.reset();
   };
 
+  //______________________________________________________________________________
+
+  //GAME INITIALIZATION AND TASKS AUTOMATICALLY PERFORMED
+  //______________________________________________________________________________
   useEffect(() => {
     if (turn !== null) {
       getTiles();
@@ -157,63 +168,6 @@ const GameScreen = ({
     }
   }, [boardIsDisabled]);
 
-  const computerMove = () => {
-    axios
-      .post("http://localhost:4001/computerMove/", {
-        rackTiles: computerRackTiles,
-        boardState,
-        computerConsecutivePasses,
-        lang,
-        level,
-      })
-      .then((res) => {
-        setTimeout(() => {
-          if (res.data.exchange && pouch.length > 0) {
-            setComputerConsecutivePasses(0);
-            setNotification("SkrablBot has exchanged his tiles.");
-            const computerRackTilesCopy = [...computerRackTiles];
-            setPouch([...pouch, ...computerRackTilesCopy]);
-            setComputerRackTiles([]);
-            //computer rack tiles might not be updated by the time getTiles is called
-            nextPlayer(0, scores, highestScoringWord);
-          } else if (res.data.pass || (res.data.exchange && !pouch.length)) {
-            setComputerConsecutivePasses(computerConsecutivePasses + 1);
-            setNotification("SkrablBot has decided to pass.");
-            nextPlayer(1, scores, highestScoringWord);
-          } else {
-            setComputerConsecutivePasses(0);
-            const newWords = findWordsOnBoard(
-              res.data.newBoardState,
-              res.data.tilesUsed
-            ).filter((word) => word.newWord === true);
-            const [turnPoints, turnHighScore] = getTurnPoints(
-              newWords,
-              res.data.tilesUsed,
-              turn
-            );
-            if (turnHighScore.points > highestScoringWord.points) {
-              setHighestScoringWord(turnHighScore);
-            }
-            const playerPreviousPoints = scores[turn];
-            const updatedScores = {
-              ...scores,
-              [turn]: playerPreviousPoints + turnPoints,
-            };
-            setBoardState(res.data.newBoardState);
-            setComputerRackTiles(res.data.newRackTiles);
-            setScores(updatedScores);
-            nextPlayer(
-              consecutivePasses * -1,
-              updatedScores,
-              highestScoringWord
-            );
-          }
-        }, Math.floor(Math.random() * 6000 + 3000));
-      });
-  };
-
-  //EFFECTS
-
   useEffect(() => {
     //get board and set inital state
     if (gameMode === "Online") {
@@ -223,7 +177,6 @@ const GameScreen = ({
           ? gameData.gameState.player1Tiles
           : gameData.gameState.player2Tiles
       );
-      setBoardState(gameData.gameState.boardState);
       setTimeLeftPlayer(
         currentPlayer === 0
           ? gameData.gameState.player1TimeLeft
@@ -235,6 +188,7 @@ const GameScreen = ({
           : gameData.gameState.player2TimeLeft
       );
       setScores(gameData.gameState.scores);
+      setBoardState(gameData.gameState.boardState);
       setTurn(gameData.gameState.turn);
       setConsecutivePasses(gameData.gameState.consecutivePasses);
       setPouch(gameData.gameState.pouch);
@@ -245,38 +199,18 @@ const GameScreen = ({
       fillPouch();
       setTurn(0);
     }
-    getBoard();
+
+    if (gameData) {
+      if (gameData.gameState.boardState.length === 0) {
+        getBoard();
+      }
+    }
+    if (gameMode === "Computer") {
+      getBoard();
+    }
   }, [gameMode]);
 
-  useEffect(() => {
-    placeTile();
-  }, [selectedSquareIndex]);
-
-  useEffect(() => {
-    if (
-      consecutivePasses > 5 ||
-      (consecutivePasses > 1 && pouch.length === 0)
-    ) {
-      // game ends if players pass six turns in a row, or pass twice when there are no tiles left in pouch
-      // end game
-      gameOver();
-    }
-  }, [consecutivePasses]);
-
-  useEffect(() => {
-    //called here to make sure pouch and player rack have finished updating first
-    if (gameMode === "Computer" && turn === 1) {
-      computerMove();
-    }
-  }, [playerRackTiles]);
-
-  useEffect(() => {
-    //if human passes or exchanges tiles, the above useEffect won't work so just call computerMove when turn changes
-    if (gameMode === "Computer" && turn === 1 && playerRackTiles.length === 7) {
-      computerMove();
-    }
-  }, [turn]);
-
+  //handle blank tile
   useEffect(() => {
     if (selectedTile) {
       const tile = selectedTile;
@@ -286,44 +220,6 @@ const GameScreen = ({
       placeTile2();
     }
   }, [blankTileLetter]);
-
-  useEffect(() => {
-    if (gameMode === "Online") {
-      socket.on("sendingTiles", (data) => {
-        setPlayerRackTiles([...playerRackTiles, ...data]);
-        //here currentRackTiles are always 7
-      });
-
-      socket.on("gameEnd", (data) => {
-        //redirect to players screen or show who won
-        console.log(data.gameEndedBy); // player 0 or player 1
-        console.log(data.game.gameState.outcome); //the outcome
-        setOutcome(data.game.gameState.outcome);
-        setEndedBy(data.gameEndedBy);
-        exitGame();
-      });
-
-      socket.on("gameUpdated", (data) => {
-        setGameIsOver(data.gameState.isOver);
-        setBoardState(data.gameState.boardState);
-        setTimeLeftPlayer(
-          currentPlayer === 0
-            ? gameData.gameState.player1TimeLeft
-            : gameData.gameState.player2TimeLeft
-        );
-        setTimeLeftOpponent(
-          currentPlayer === 1
-            ? gameData.gameState.player1TimeLeft
-            : gameData.gameState.player2TimeLeft
-        );
-        setScores(data.gameState.scores);
-        setTurn(data.gameState.turn);
-        setConsecutivePasses(data.gameState.consecutivePasses);
-        setHighestScoringWord(data.gameState.highestScoringWord);
-        setOutcome(data.gameState.outcome);
-      });
-    }
-  }, [playerRackTiles]);
 
   const getBoard = () => {
     const squares = generateBoardSquares(bonusSquareIndices);
@@ -394,6 +290,167 @@ const GameScreen = ({
     }
   };
 
+  useEffect(() => {
+    if (gameMode === "Online") {
+      socket.on("sendingTiles", (data) => {
+        setPlayerRackTiles([...playerRackTiles, ...data]);
+        //here currentRackTiles are always 7
+      });
+
+      socket.on("gameEnd", (data) => {
+        //redirect to players screen or show who won
+        setOutcome(data.game.gameState.outcome);
+        setEndedBy(data.gameEndedBy);
+        exitGame();
+      });
+
+      //update global game data here for reloads
+      socket.on("gameUpdated", (data) => {
+        setGameIsOver(data.gameState.isOver);
+        setBoardState(data.gameState.boardState);
+        setTimeLeftPlayer(
+          currentPlayer === 0
+            ? gameData.gameState.player1TimeLeft
+            : gameData.gameState.player2TimeLeft
+        );
+        setTimeLeftOpponent(
+          currentPlayer === 1
+            ? gameData.gameState.player1TimeLeft
+            : gameData.gameState.player2TimeLeft
+        );
+        setScores(data.gameState.scores);
+        setTurn(data.gameState.turn);
+        setConsecutivePasses(data.gameState.consecutivePasses);
+        setHighestScoringWord(data.gameState.highestScoringWord);
+        setOutcome(data.gameState.outcome);
+      });
+    }
+  }, [playerRackTiles]);
+
+  const handleTimeOut = () => {
+    setOutcome("TimeOut");
+    gameOver("TimeOut");
+  };
+
+  const handleTimeWarning = () => {
+    setTimeWarning(true);
+  };
+
+  useEffect(() => {
+    if (placedTiles.length > 0) {
+      getWordsOnBoard();
+    }
+  }, [placedTiles]);
+
+  const getWordsOnBoard = () => {
+    const words = findWordsOnBoard(boardState, placedTiles);
+    setWordsOnBoard(words);
+  };
+
+  const gameOver = (outcome) => {
+    if (gameMode === "Online") {
+      socket.emit("gameOver", gameData.gameId, outcome, currentPlayer);
+    }
+    if (gameMode === "Computer") {
+      setGameIsOver(true);
+      exitGame();
+    }
+  };
+
+  //______________________________________________________________________________
+
+  //COMPUTER MODE FUNCTIONS
+  //______________________________________________________________________________
+  const computerMove = () => {
+    axios
+      .post("http://localhost:4001/computerMove/", {
+        rackTiles: computerRackTiles,
+        boardState,
+        computerConsecutivePasses,
+        lang,
+        level,
+      })
+      .then((res) => {
+        setTimeout(() => {
+          if (res.data.exchange && pouch.length > 0) {
+            setComputerConsecutivePasses(0);
+            setNotification("SkrablBot has exchanged his tiles.");
+            const computerRackTilesCopy = [...computerRackTiles];
+            setPouch([...pouch, ...computerRackTilesCopy]);
+            setComputerRackTiles([]);
+            //computer rack tiles might not be updated by the time getTiles is called
+            nextPlayer(0, scores, highestScoringWord);
+          } else if (res.data.pass || (res.data.exchange && !pouch.length)) {
+            setComputerConsecutivePasses(computerConsecutivePasses + 1);
+            setNotification("SkrablBot has decided to pass.");
+            nextPlayer(1, scores, highestScoringWord);
+          } else {
+            setComputerConsecutivePasses(0);
+            const newWords = findWordsOnBoard(
+              res.data.newBoardState,
+              res.data.tilesUsed
+            ).filter((word) => word.newWord === true);
+            const [turnPoints, turnHighScore] = getTurnPoints(
+              newWords,
+              res.data.tilesUsed,
+              turn
+            );
+            if (turnHighScore.points > highestScoringWord.points) {
+              setHighestScoringWord(turnHighScore);
+            }
+            const playerPreviousPoints = scores[turn];
+            const updatedScores = {
+              ...scores,
+              [turn]: playerPreviousPoints + turnPoints,
+            };
+            setBoardState(res.data.newBoardState);
+            setComputerRackTiles(res.data.newRackTiles);
+            setScores(updatedScores);
+            nextPlayer(
+              consecutivePasses * -1,
+              updatedScores,
+              highestScoringWord
+            );
+          }
+        }, Math.floor(Math.random() * 6000 + 3000));
+      });
+  };
+
+  useEffect(() => {
+    //called here to make sure pouch and player rack have finished updating first
+    if (gameMode === "Computer" && turn === 1) {
+      computerMove();
+    }
+  }, [playerRackTiles]);
+
+  useEffect(() => {
+    //if human passes or exchanges tiles, the above useEffect won't work so just call computerMove when turn changes
+    if (gameMode === "Computer" && turn === 1 && playerRackTiles.length === 7) {
+      computerMove();
+    }
+  }, [turn]);
+
+  //______________________________________________________________________________
+
+  //GAME PLAY BY USER
+  //______________________________________________________________________________
+  useEffect(() => {
+    placeTile();
+  }, [selectedSquareIndex]);
+
+  //consecutive passes
+  useEffect(() => {
+    if (
+      consecutivePasses > 5 ||
+      (consecutivePasses > 1 && pouch.length === 0)
+    ) {
+      // game ends if players pass six turns in a row, or pass twice when there are no tiles left in pouch
+      // end game
+      gameOver();
+    }
+  }, [consecutivePasses]);
+
+  //the placed tile is sent to check for blank tiles
   const placeTile = () => {
     if (selectedSquareIndex !== null) {
       const squareIsOccupied = squaresAreOccupied(
@@ -404,7 +461,6 @@ const GameScreen = ({
         return;
       }
       playSound(placeTileSound);
-
       if (selectedTile.letter === "") {
         setConfirmMessage({
           type: "blankTile",
@@ -420,6 +476,7 @@ const GameScreen = ({
     }
   };
 
+  //placetile's second part. after values are assigned to blank tiles
   const placeTile2 = () => {
     const tileToAdd = {
       ...selectedTile,
@@ -433,7 +490,6 @@ const GameScreen = ({
         return square;
       }
     });
-
     setBoardState(updatedBoardState);
     setPlacedTiles([
       ...placedTiles,
@@ -446,8 +502,7 @@ const GameScreen = ({
     setSelectedSquareIndex(null);
   };
 
-  //EVENT HANDLERS
-
+  //user clicks
   const handleClickSquare = (square) => {
     if (currentPlayer !== turn) {
       return;
@@ -457,6 +512,7 @@ const GameScreen = ({
     }
   };
 
+  //user wnats to remove a placed tile
   const handleClickPlacedTile = (tileToRemove) => {
     if (
       selectedTile === 0 ||
@@ -465,7 +521,6 @@ const GameScreen = ({
         .length === 0
     )
       return;
-
     if (tileToRemove.player === 0) {
       playSound(removeTileSound);
       const updatedBoardState = boardState.map((square) => {
@@ -484,6 +539,7 @@ const GameScreen = ({
     }
   };
 
+  //user wants to pass
   const handleClickPass = () => {
     if (currentPlayer !== turn) return;
     if (consecutivePasses === 5) {
@@ -509,11 +565,6 @@ const GameScreen = ({
     });
   };
 
-  const playSound = (audioFile) => {
-    const audio = new Audio(audioFile);
-    audio.play();
-  };
-
   const handleClickShuffle = () => {
     playSound(shuffleSound);
     const shuffled = shuffle([...playerRackTiles]);
@@ -535,27 +586,6 @@ const GameScreen = ({
     } else {
       setSelectedTile(tile);
     }
-  };
-
-  const handleResign = () => {
-    closeModal();
-    setOutcome("Resign");
-    gameOver("Resign");
-  };
-
-  const handlePass = () => {
-    closeModal();
-    nextPlayer(1, scores, highestScoringWord);
-    setConsecutivePasses(consecutivePasses + 1);
-  };
-
-  const handleTimeOut = () => {
-    setOutcome("TimeOut");
-    gameOver("TimeOut");
-  };
-
-  const handleTimeWarning = () => {
-    setTimeWarning(true);
   };
 
   const handleClickExchangeTiles = () => {
@@ -598,17 +628,6 @@ const GameScreen = ({
     ];
     setBoardState([...updatedBoardState]);
     setPlacedTiles([]);
-  };
-
-  useEffect(() => {
-    if (placedTiles.length > 0) {
-      getWordsOnBoard();
-    }
-  }, [placedTiles]);
-
-  const getWordsOnBoard = () => {
-    const words = findWordsOnBoard(boardState, placedTiles);
-    setWordsOnBoard(words);
   };
 
   const handleClickConfirmMove = () => {
@@ -687,15 +706,36 @@ const GameScreen = ({
     }
   };
 
-  //OTHER
+  //______________________________________________________________________________
 
-  const gameOver = (outcome) => {
-    if (gameMode === "Online") {
-      socket.emit("gameOver", gameData.gameId, outcome, currentPlayer);
-    }
-    if (gameMode === "Computer") {
-      setGameIsOver(true);
-      exitGame();
+  //MODAL CONFRIMATION FUNCTIONS
+  //______________________________________________________________________________
+
+  const handleResign = () => {
+    closeModal();
+    setOutcome("Resign");
+    gameOver("Resign");
+  };
+
+  const handlePass = () => {
+    closeModal();
+    nextPlayer(1, scores, highestScoringWord);
+    setConsecutivePasses(consecutivePasses + 1);
+  };
+
+  const closeModal = () => {
+    setConfirmMessage(null);
+  };
+
+  //______________________________________________________________________________
+
+  //OTHER FUNCTIONS
+  //______________________________________________________________________________
+
+  const playSound = (audioFile) => {
+    if (!mute) {
+      const audio = new Audio(audioFile);
+      audio.play();
     }
   };
 
@@ -707,14 +747,14 @@ const GameScreen = ({
     if (gameMode === "Online") {
       resetChatMsg();
       setCurrentComponent("Login");
+      setInvitedPlayer(null);
+      setGameData("null");
+      setInviteSent(false);
+      setGameId("");
     } else {
-      setCurrentComponent("WelcomeScreen");
+      setCurrentComponent("GameModeScreen");
       setGameMode(null);
     }
-  };
-
-  const closeModal = () => {
-    setConfirmMessage(null);
   };
 
   const onDragEnd = (result) => {
@@ -824,6 +864,8 @@ const GameScreen = ({
     }
   };
 
+  //______________________________________________________________________________
+
   return (
     <Fade className="container__full-height" triggerOnce>
       <div className="gameScreen__wrapper">
@@ -836,7 +878,13 @@ const GameScreen = ({
             lang={lang}
           />
         )}
-        <div className="gameScreen__main">
+        <div
+          className={
+            gameMode === "Computer"
+              ? "gameScreen__main"
+              : "gameScreen__main gameScreen__chat"
+          }
+        >
           <div className="gameScreen__board">
             <DragDropContext onDragEnd={onDragEnd}>
               <Board

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../styles/Players.css";
 import { Fade } from "react-awesome-reveal";
+import Login from "./Login";
 
 const Players = ({
   players,
@@ -15,8 +16,34 @@ const Players = ({
   setCurrentPlayer,
   handleStart,
   lang,
+  setLang,
+  setInviteSent
+
 }) => {
+
   let [invite, setInvite] = useState("");
+  
+  socket.on("userChangeRoom", (data) => {
+    setLang(data)
+        setCurrentComponent("Login")
+  });
+  
+  
+  useEffect(() => {
+      socket.off("playerUnavailable").on("playerUnavailable", (data) => {
+      console.log("3. got player availabilty")
+      if (data === true) {
+        setNotification("Player is in another game");
+        return;
+      } else {
+        socket.emit("createGame", { userToken: user.token, lang: lang });
+        console.log("4. sending create game to backend")
+      }
+        });
+}, [])
+ 
+   
+  
   socket.on("invite", (data) => {
     setInvite(data);
   });
@@ -48,27 +75,19 @@ const Players = ({
   });
 
   const sendInvite = (player) => {
+    setInvitedPlayer(player);
+    console.log("1. cliked on player. emitting playerInGame")
     socket.emit("playerInGame", player);
-    socket.on("playerUnavailable", (data) => {
-      console.log(data);
-      if (data === true) {
-        setNotification("Player is in another game");
-        return;
-      } else {
-        socket.emit("createGame", { userToken: user.token, lang: lang });
-        //invalid userId on create game
-        socket.on("createGameError", (data) => {
+    
+      socket.on("createGameError", (data) => {
           console.log(data);
           return;
         });
-        socket.on("gameCreateResponse", (data) => {
-          console.log("the game Id got back: " + data);
+     socket.on("gameCreateResponse", (data) => {
+          console.log("6. IN GAMEcREATErESPONSEthe game Id got back: " + data);
           setGameId(data);
-          setInvitedPlayer(player);
           setCurrentComponent("InviteScreen");
         });
-      }
-    });
   };
 
   return (

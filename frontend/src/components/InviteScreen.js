@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../styles/InviteScreen.css";
 import { Fade } from "react-awesome-reveal";
 
@@ -14,9 +14,9 @@ const InviteScreen = ({
   inviteSent,
   setInviteSent,
   lang,
+  setLang
 }) => {
   const [timeInput, setTimeInput] = useState(20);
-
   let [invite, setInvite] = useState("");
 
   const handleTimeChange = (e) => {
@@ -28,9 +28,19 @@ const InviteScreen = ({
     socket.on("removedGame", (data) => {
       console.log(data);
       setInvitedPlayer("");
+      setInviteSent(false)
+      setInvite("")
       setCurrentComponent("Players");
     });
   };
+
+  socket.on("userChangeRoom", (data) => {
+    setLang(data)
+     setInvitedPlayer("");
+    setInviteSent(false)
+    setCurrentComponent("Login")
+      });
+
 
   socket.on("gameJoined2", (data) => {
     if (invite === "") {
@@ -74,16 +84,18 @@ const InviteScreen = ({
       gameId: gameId,
       time: timeInput,
     });
+  };
 
-    //add notifications here and setDisplayedComponentBack
+    useEffect(() => {
+       //add notifications here and setDisplayedComponentBack
+      
     socket.on("joinGameError", (data) => {
       console.log(data);
       setInviteSent(false);
       setCurrentComponent = "Players";
     });
-
     //on succesful game join
-    socket.on("gameJoined", (data) => {
+    socket.off("gameJoined").on("gameJoined", (data) => {
       console.log(data);
       setInviteSent(true);
       socket.emit("gameRequest", {
@@ -103,7 +115,9 @@ const InviteScreen = ({
         setCurrentComponent("GameScreen");
       });
     });
-  };
+    }, [])
+  
+
 
   return (
     <Fade triggerOnce>

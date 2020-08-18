@@ -22,3 +22,43 @@
   max-width: 510px;
   max-height: 65px;
 }
+
+.tileRack__tile {
+  width: 13.8%;
+  max-width: 100px;
+  margin: 0 1px;
+}
+
+/* tablet */
+@media (min-width: 510px) {
+  .tileRack__wrapper {
+    max-height: 75px;
+  }
+}
+
+/* large tablet */
+@media (min-width: 850px) {
+  .tileRack__wrapper {
+    width: 70vh;
+    margin-top: 10px;
+    height: 10vh;
+    justify-content: flex-start;
+    max-width: 70vh;
+    max-height: 10vh;
+    min-width: 475px;
+    min-height: 70px;
+  }
+  .tileRack__tile {
+    width: 13.9%;
+    max-width: 100px;
+    margin: 0 1px;
+  }
+}
+
+/* laptop */
+@media (min-width: 1000px) {
+}
+
+/* desktop */
+@media (min-width: 1250px) {
+}

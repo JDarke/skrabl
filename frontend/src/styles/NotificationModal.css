@@ -1,5 +1,5 @@
 .notificationModal__wrapper {
-  position: absolute;
+  position: fixed;
   top: 0;
   right: 0;
   bottom: 0;
@@ -8,6 +8,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  height: 100%;
 }
 
 .notificationModal__content {
@@ -17,7 +18,8 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 1rem 0;
+  padding: 1rem;
+  text-align: center;
   font-size: 1.5rem;
   min-height: 200px;
   border-radius: 6px;
